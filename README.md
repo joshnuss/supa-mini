@@ -39,15 +39,23 @@ curl "localhost:3000/products?id.eq=123"
 Inserting:
 
 ```bash
-curl -x POST localhost:3000/products \
+curl -X POST localhost:3000/products \
   -H 'content-type: application/json' \
   --data '{"name": "t-shirt", "price": 25}'
+```
+
+Updating:
+
+```bash
+curl -X PUT "localhost:3001/products?id.eq=1" \
+  -H 'content-type: application/json' \
+  --data '{"price": "99.99"}'
 ```
 
 Deleting:
 
 ```bash
-curl -x DELETE "localhost:3000/products?id.eq=1"
+curl -X DELETE "localhost:3000/products?id.eq=1"
 ```
 
 ## License

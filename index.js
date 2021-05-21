@@ -33,6 +33,15 @@ app.post('/:table', async (req, res) => {
   res.json(results)
 })
 
+app.put('/:table', async (req, res) => {
+  console.log(req.body)
+  const results = await filter(req.params.table, req.query)
+    .update(req.body)
+    .returning('*')
+
+  res.json(results)
+})
+
 app.delete('/:table', async (req, res) => {
   const results = await filter(req.params.table, req.query)
     .delete()
