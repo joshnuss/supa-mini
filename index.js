@@ -46,7 +46,6 @@ app.delete('/:table', async (req, res) => {
 })
 
 wss.on('connection', ws => {
-  //connection is up, let's add a simple simple event
   ws.on('message', async payload => {
     const message = JSON.parse(payload)
     const send = (payload) => ws.send(JSON.stringify(payload))
