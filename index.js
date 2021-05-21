@@ -1,16 +1,12 @@
-import dotenv from 'dotenv'
 import express from 'express'
+import WebSocket from 'ws'
+import http from 'http'
 import bodyParser from 'body-parser'
-import configure from 'knex'
-
-dotenv.config()
-
-const db = configure({
-  client: 'pg',
-  connection: process.env.CONNECTION_STRING
-})
+import { db, filter, maybeTransact } from './src/db.js'
 
 const app = express()
+const server = http.createServer(app)
+const wss = new WebSocket.Server({server})
 
 app.use(bodyParser.json())
 
@@ -49,60 +45,83 @@ app.delete('/:table', async (req, res) => {
   res.json(results)
 })
 
-function filter(tableName, query) {
-  let table = db(tableName)
-  const keys = Object.keys(query)
+wss.on('connection', ws => {
+  //connection is up, let's add a simple simple event
+  ws.on('message', async payload => {
+    const message = JSON.parse(payload)
+    const send = (payload) => ws.send(JSON.stringify(payload))
+    let command, results
+    const transaction = ws.transaction
 
-  if (keys.length === 0) return table
+    switch (message.type) {
+      case 'query':
+        command = filter(message.table, message.query)
+        results = await maybeTransact(command, transaction)
 
-  keys.forEach(key => {
-    const [column, op] = key.split('.')
-    const value = query[key]
+        send(results)
+        break
 
-    switch (op) {
-      case 'eq':
-        table = table.where(column, value)
+      case 'insert':
+        command = filter(message.table)
+          .insert(message.payload)
+          .returning('*')
+
+        results = await maybeTransact(command, transaction)
+
+        send(results)
         break
-      case 'gt':
-        table = table.where(column, '>', value)
+
+      case 'update':
+        command = filter(message.table, message.query)
+          .update(message.payload)
+          .returning('*')
+
+        results = await maybeTransact(command, transaction)
+
+        send(results)
         break
-      case 'gte':
-        table = table.where(column, '>=', value)
+
+      case 'delete':
+        command = filter(message.table, message.query)
+          .delete()
+          .returning('*')
+
+        results = await maybeTransact(command, transaction)
+
+        send(results)
         break
-      case 'lt':
-        table = table.where(column, '<', value)
+
+      case 'tx:start':
+        if (transaction) throw new Error('transaction is already open')
+
+        const isolationLevel = message.isolationLevel || 'read committed'
+        ws.transaction = await db.transaction({isolationLevel})
+
+        send({"tx:start": true})
         break
-      case 'lte':
-        table = table.where(column, '<=', value)
+
+      case 'tx:commit':
+        if (!transaction || transaction.isCompleted()) throw new Error('no transaction is open')
+
+        transaction.commit()
+        ws.transaction = null
+
+        send({"tx:commit": true})
         break
-      case 'neq':
-        table = table.where(column, '!=', value)
+
+      case 'tx:rollback':
+        if (!transaction || transaction.isCompleted()) throw new Error('no transaction is open')
+
+        transaction.rollback()
+        ws.transaction = null
+
+        send({"tx:rollback": true})
         break
-      case 'like':
-        table = table.where(column, 'like', `%${value}%`)
-        break
-      case 'ilike':
-        table = table.where(column, 'ilike', `%${value}%`)
-        break
-      case 'is':
-        switch (value.toLowerCase()) {
-          case 'null':
-            table = table.whereNull(column)
-            break;
-          case 'false':
-            table = table.where(column, false)
-            break;
-          case 'true':
-            table = table.where(column, true)
-            break;
-        }
-        break
+
       default:
-        throw new Error(`Unknown filter ${key}=${value}`)
+        send({message: `unknown type ${message.type}`})
     }
   })
+})
 
-  return table
-}
-
-app.listen(process.env.PORT || 3000)
+server.listen(process.env.PORT || 3000)
