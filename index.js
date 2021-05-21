@@ -34,7 +34,6 @@ app.post('/:table', async (req, res) => {
 })
 
 app.put('/:table', async (req, res) => {
-  console.log(req.body)
   const results = await filter(req.params.table, req.query)
     .update(req.body)
     .returning('*')
@@ -51,7 +50,6 @@ app.delete('/:table', async (req, res) => {
 })
 
 function filter(tableName, query) {
-  console.log(query)
   let table = db(tableName)
   const keys = Object.keys(query)
 
