@@ -111,6 +111,7 @@ Committing a transaction:
 > {"type": "insert", "table": "products", "payload": {"name": "socks", "price": "999"}}
 < [{"id":14,"name":"socks","description":null,"price":"$999.00"}]
 > {"type": "tx:commit"}
+< {"tx:commit":true}
 ```
 
 Rolling back a transaction:
@@ -124,6 +125,7 @@ Rolling back a transaction:
 > {"type": "insert", "table": "products", "payload": {"name": "socks", "price": "999"}}
 < [{"id":14,"name":"socks","description":null,"price":"$999.00"}]
 > {"type": "tx:rollback"}
+< {"tx:rollback":true}
 ```
 
 ## License
