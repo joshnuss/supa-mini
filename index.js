@@ -50,12 +50,11 @@ wss.on('connection', ws => {
     const message = JSON.parse(payload)
     const send = (payload) => ws.send(JSON.stringify(payload))
     let command, results
-    const transaction = ws.transaction
 
     switch (message.type) {
       case 'query':
         command = filter(message.table, message.query)
-        results = await maybeTransact(command, transaction)
+        results = await maybeTransact(command, ws.transaction)
 
         send(results)
         break
@@ -65,7 +64,7 @@ wss.on('connection', ws => {
           .insert(message.payload)
           .returning('*')
 
-        results = await maybeTransact(command, transaction)
+        results = await maybeTransact(command, ws.transaction)
 
         send(results)
         break
@@ -75,7 +74,7 @@ wss.on('connection', ws => {
           .update(message.payload)
           .returning('*')
 
-        results = await maybeTransact(command, transaction)
+        results = await maybeTransact(command, ws.transaction)
 
         send(results)
         break
@@ -85,13 +84,13 @@ wss.on('connection', ws => {
           .delete()
           .returning('*')
 
-        results = await maybeTransact(command, transaction)
+        results = await maybeTransact(command, ws.transaction)
 
         send(results)
         break
 
       case 'tx:start':
-        if (transaction) throw new Error('transaction is already open')
+        if (ws.transaction) throw new Error('transaction is already open')
 
         const isolationLevel = message.isolationLevel || 'read committed'
         ws.transaction = await db.transaction({isolationLevel})
@@ -100,18 +99,18 @@ wss.on('connection', ws => {
         break
 
       case 'tx:commit':
-        if (!transaction || transaction.isCompleted()) throw new Error('no transaction is open')
+        if (!ws.transaction || ws.transaction.isCompleted()) throw new Error('no transaction is open')
 
-        transaction.commit()
+        ws.transaction.commit()
         ws.transaction = null
 
         send({"tx:commit": true})
         break
 
       case 'tx:rollback':
-        if (!transaction || transaction.isCompleted()) throw new Error('no transaction is open')
+        if (!ws.transaction || ws.transaction.isCompleted()) throw new Error('no transaction is open')
 
-        transaction.rollback()
+        ws.transaction.rollback()
         ws.transaction = null
 
         send({"tx:rollback": true})
